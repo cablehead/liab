@@ -35,10 +35,10 @@ timestamp_mask = -1 >> timestamp_left_shift << timestamp_left_shift
 class Flake(int):
     @staticmethod
     def from_bytes(key):
-        return Flake(int.from_bytes(key, sys.byteorder))
+        return Flake(int.from_bytes(key, 'big'))
 
     def to_bytes(self):
-        return super().to_bytes(7, sys.byteorder)
+        return super().to_bytes(7, 'big')
     encode = to_bytes
 
     def to_timestamp(self):
