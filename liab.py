@@ -94,45 +94,42 @@ def next_id(
         return next_id(worker_id, get, put, sleep=sleep, now=now)
 
 
-class LMDB:
-    class Env:
-        def __init__(self, env):
-            self.env = env
-
-        def rx(self):
-            return LMDB.Tx(self.env)
-
-        def open_db(self, *a, **kw):
-            return self.env.open_db(*a, **kw)
-
-    class Tx:
-        def __init__(self, env, write=False):
-            self.env = env
-            self.write = write
-
-        def cursor(self):
-            return self.tx.cursor()
-
-        def get(self, key, *a, **kw):
-            return self.tx.get(LMDB.to_bytes(key), *a, **kw)
-
-        def put(self, key, *a, **kw):
-            return self.tx.put(LMDB.to_bytes(key), *a, **kw)
-
-        def delete(self, *a, **kw):
-            return self.tx.delete(*a, **kw)
+def to_bytes(*a):
+    ret = []
+    for x in a:
+        while hasattr(x, 'encode'):
+            x = x.encode()
+        if type(x) in [list, tuple]:
+            ret.append(to_bytes(*x))
+        else:
+            ret.append(x)
+    return b''.join(ret)
 
 
-def to_bytes(*key):
-    return b''.join(getattr(x, 'encode', lambda: x)() for x in key)
+class DB:
+    def __init__(self, tx, db):
+        self.tx = tx
+        self.db = db
+
+    def cursor(self, *a, **kw):
+        kw.setdefault('db', self.db)
+        return self.tx.cursor(*a, **kw)
+
+    def get(self, *a, **kw):
+        kw.setdefault('db', self.db)
+        return self.tx.get(*a, **kw)
+
+    def put(self, *a, **kw):
+        kw.setdefault('db', self.db)
+        return self.tx.put(*a, **kw)
 
 
 class LIAB:
     def __init__(self, path):
         self.env = lmdb.open(path, max_dbs=3)
-        self.o = self.env.open_db(b'o')
-        self.i = self.env.open_db(b'i')
-        self.m = self.env.open_db(b'm')
+        self.o = self.env.open_db(b'o')  # objects
+        self.i = self.env.open_db(b'i')  # indices
+        self.m = self.env.open_db(b'm')  # meta
 
     def rx(self):
         return LIAB.Rx(self)
@@ -144,6 +141,18 @@ class LIAB:
         def __init__(self, store):
             self.store = store
             self.tx = self.store.env.begin()
+
+        @property
+        def o(self):
+            return DB(self.tx, self.store.o)
+
+        @property
+        def i(self):
+            return DB(self.tx, self.store.i)
+
+        @property
+        def m(self):
+            return DB(self.tx, self.store.m)
 
         def __enter__(self):
             return self
@@ -175,63 +184,69 @@ class LIAB:
         def _id(self):
             return next_id(
                 0,
-                lambda: self.tx.get(b'flake', db=self.store.m),
-                lambda x: self.tx.put(b'flake', x, db=self.store.m))
-
-        def insert(self, name, data):
-            _id = self._id()
-            self.tx.put(
-                to_bytes(name, _id),
-                msgpack.packb(data),
-                db=self.store.o)
-            return _id
+                lambda: self.m.get(b'flake'),
+                lambda x: self.m.put(b'flake', x))
 
 
 class Bucket:
-    def __init__(self, tx):
-        pass
+    def __init__(self, session, spec, key):
+        self.session = session
+        self.spec = spec
+        self.key = key
 
     def get(self):
-        return []
+        c = self.session.tx.o.cursor()
+        prefix = to_bytes(self.key)
+        c.set_range(prefix)
+        ret = []
+        for key in c.iternext(values=False):
+            if not key.startswith(prefix):
+                break
+            ret.append(Flake.from_bytes(key[len(prefix):]))
+        return ret
 
     def set(self, item):
-        pass
+        return self.session.tx.o.put(to_bytes(self.key, item))
 
 
 class HashItem:
-    def __init__(self, hash, _id):
-        self.hash = hash
-        self._id = _id
+    def __init__(self, session, spec, key):
+        self.session = session
+        self.spec = spec
+        self.key = key
+        self._id = key[-1]
 
     def __getattr__(self, name):
-        d = self.hash.schema[name]
+        d = self.spec[name]
         assert d['typ'] == 'bucket'
-        return Bucket(self.hash)
+        return Bucket(self.session, d, self.key + [name])
 
-    def __repr__(self):
-        return '<{}: {}>'.format(self.hash.name.capitalize(), self._id)
+    def encode(self):
+        return self._id
 
 
 class Hash:
-    def __init__(self, tx, name, schema):
-        self.tx = tx
-        self.name = name
-        self.schema = schema
+    def __init__(self, session, spec, key):
+        self.session = session
+        self.spec = spec
+        self.key = key
 
     def insert(self, data):
-        _id = self.tx.insert(self.name, data)
-        return HashItem(self, _id)
+        _id = self.session.tx._id()
+        key = self.key + [_id]
+        self.session.tx.i.put(to_bytes(key), msgpack.packb(data))
+        return HashItem(self.session, self.spec, key)
 
 
-class Schema:
-    def __init__(self, tx, schema):
-        self.tx = tx
+class Session:
+    def __init__(self, schema, tx):
         self.schema = schema
+        self.tx = tx
 
     def __getattr__(self, name):
         d = self.schema[name]
         assert d['typ'] == 'hash'
-        return Hash(self.tx, name, self.schema[name])
+        return Hash(self, d, [name])
 
     def __repr__(self):
-        return '<Schema {}>'.format(self.path)
+        return '<Session {}>'.format(self.path)
