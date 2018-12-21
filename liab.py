@@ -130,13 +130,16 @@ class LIAB:
         self.i = self.env.open_db(b'i')
         self.m = self.env.open_db(b'm')
 
+    def rx(self):
+        return LIAB.Rx(self)
+
     def wx(self):
         return LIAB.Wx(self)
 
-    class Wx:
+    class Rx:
         def __init__(self, store):
             self.store = store
-            self.tx = self.store.env.begin(write=True)
+            self.tx = self.store.env.begin()
 
         def __enter__(self):
             return self
@@ -146,19 +149,6 @@ class LIAB:
                 self.tx.abort()
             else:
                 self.tx.commit()
-
-        def _id(self):
-            return next_id(
-                0,
-                lambda: self.tx.get(b'flake', db=self.store.m),
-                lambda x: self.tx.put(b'flake', x, db=self.store.m))
-
-        def insert(self, name, data):
-            _id = self._id()
-            self.tx.put(
-                to_bytes(name, _id),
-                msgpack.packb(data),
-                db=self.store.o)
 
         def get(self, name):
             prefix = to_bytes(name)
@@ -172,3 +162,22 @@ class LIAB:
                 if not key.startswith(prefix):
                     return
                 yield Flake.from_bytes(c.key()[len(prefix):])
+
+    class Wx(Rx):
+        def __init__(self, store):
+            self.store = store
+            self.tx = self.store.env.begin(write=True)
+
+        def _id(self):
+            return next_id(
+                0,
+                lambda: self.tx.get(b'flake', db=self.store.m),
+                lambda x: self.tx.put(b'flake', x, db=self.store.m))
+
+        def insert(self, name, data):
+            _id = self._id()
+            self.tx.put(
+                to_bytes(name, _id),
+                msgpack.packb(data),
+                db=self.store.o)
+            return _id
