@@ -1,3 +1,4 @@
+import logging
 import ctypes
 import time
 import sys
@@ -6,10 +7,14 @@ import msgpack
 import lmdb
 
 
+log = logging.getLogger(__name__)
+
+
 class Fity3(ctypes.Structure):
     _fields_ = [
         ('sequence', ctypes.c_uint),
         ('last', ctypes.c_ulonglong), ]
+
 
 class Fity3Exception(Exception):
     pass
