@@ -1,9 +1,62 @@
+import pytest
+
 import liab
 
 
+"""
+i.user<id>
+o.<id>room<id>
+
+i.room<id>
+o.<id>user<id>
+o.<id>message<id>
+"""
+
+schema = {
+    'user': {
+        'typ': 'hash',
+        'rooms': {
+            'typ': 'bucket',
+        },
+    },
+    'room': {
+        'users': {
+            'typ': 'bucket',
+        },
+        'messaegs': {
+            'typ': 'stream',
+        },
+    },
+}
+
+
+def test_schema(tmp_path):
+    print()
+    s = liab.LIAB(str(tmp_path))
+
+    with s.wx() as wx:
+        s = liab.Schema(wx, schema)
+        pytest.raises(KeyError, lambda: s.foo)
+
+        u1 = s.user.insert({'name': 'John'})
+        pytest.raises(KeyError, lambda: u1.foo)
+
+        print(u1.rooms)
+
+
+
+"""
+def test_relation(tmp_path):
+    s = liab.LIAB(str(tmp_path))
+    with s.wx() as wx:
+        r1 = wx.insert('room', {})
+        r2 = wx.insert('room', {'name': 'Group'})
+        u1 = wx.insert('user', {'name': 'John'})
+        u2 = wx.insert('user', {'name': 'Tom'})
+        u3 = wx.insert('person', {'name': 'Sam'})
+
+
 def test_core(tmp_path):
-    print()
-    print()
     s = liab.LIAB(str(tmp_path))
 
     with s.wx() as wx:
@@ -30,4 +83,4 @@ def test_core(tmp_path):
         for key in rx.get('person'):
             got.append(key)
         assert want == got
-    print()
+"""

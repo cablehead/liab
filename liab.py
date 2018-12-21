@@ -1,7 +1,6 @@
 import logging
 import ctypes
 import time
-import sys
 
 import msgpack
 import lmdb
@@ -35,10 +34,10 @@ timestamp_mask = -1 >> timestamp_left_shift << timestamp_left_shift
 class Flake(int):
     @staticmethod
     def from_bytes(key):
-        return Flake(int.from_bytes(key, 'big'))
+        return Flake(int.from_bytes(key, byteorder='big'))
 
     def to_bytes(self):
-        return super().to_bytes(7, 'big')
+        return super().to_bytes(7, byteorder='big')
     encode = to_bytes
 
     def to_timestamp(self):
@@ -186,3 +185,41 @@ class LIAB:
                 msgpack.packb(data),
                 db=self.store.o)
             return _id
+
+
+class HashItem:
+    def __init__(self, hash, _id):
+        self.hash = hash
+        self._id = _id
+
+    def __getattr__(self, name):
+        d = self.hash.schema[name]
+        print(d)
+
+    def __repr__(self):
+        return '<{}: {}>'.format(self.hash.name.capitalize(), self._id)
+
+
+class Hash:
+    def __init__(self, store, name, schema):
+        self.store = store
+        self.name = name
+        self.schema = schema
+
+    def insert(self, data):
+        _id = self.store.insert(self.name, data)
+        return HashItem(self, _id)
+
+
+class Schema:
+    def __init__(self, store, schema):
+        self.store = store
+        self.schema = schema
+
+    def __getattr__(self, name):
+        d = self.schema[name]
+        assert d['typ'] == 'hash'
+        return Hash(self.store, name, self.schema[name])
+
+    def __repr__(self):
+        return '<Schema {}>'.format(self.path)
