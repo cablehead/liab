@@ -17,9 +17,11 @@ schema = {
         'typ': 'hash',
         'rooms': {
             'typ': 'bucket',
+            'item': 'room',
         },
     },
     'room': {
+        'typ': 'hash',
         'users': {
             'typ': 'bucket',
         },
@@ -35,14 +37,16 @@ def test_schema(tmp_path):
     s = liab.LIAB(str(tmp_path))
 
     with s.wx() as wx:
+
         s = liab.Schema(wx, schema)
         pytest.raises(KeyError, lambda: s.foo)
 
         u1 = s.user.insert({'name': 'John'})
         pytest.raises(KeyError, lambda: u1.foo)
+        assert u1.rooms.get() == []
 
-        print(u1.rooms)
-
+        r1 = s.room.insert({'name': 'Group'})
+        u1.rooms.set(r1)
 
 
 """

@@ -187,6 +187,17 @@ class LIAB:
             return _id
 
 
+class Bucket:
+    def __init__(self, tx):
+        pass
+
+    def get(self):
+        return []
+
+    def set(self, item):
+        pass
+
+
 class HashItem:
     def __init__(self, hash, _id):
         self.hash = hash
@@ -194,32 +205,33 @@ class HashItem:
 
     def __getattr__(self, name):
         d = self.hash.schema[name]
-        print(d)
+        assert d['typ'] == 'bucket'
+        return Bucket(self.hash)
 
     def __repr__(self):
         return '<{}: {}>'.format(self.hash.name.capitalize(), self._id)
 
 
 class Hash:
-    def __init__(self, store, name, schema):
-        self.store = store
+    def __init__(self, tx, name, schema):
+        self.tx = tx
         self.name = name
         self.schema = schema
 
     def insert(self, data):
-        _id = self.store.insert(self.name, data)
+        _id = self.tx.insert(self.name, data)
         return HashItem(self, _id)
 
 
 class Schema:
-    def __init__(self, store, schema):
-        self.store = store
+    def __init__(self, tx, schema):
+        self.tx = tx
         self.schema = schema
 
     def __getattr__(self, name):
         d = self.schema[name]
         assert d['typ'] == 'hash'
-        return Hash(self.store, name, self.schema[name])
+        return Hash(self.tx, name, self.schema[name])
 
     def __repr__(self):
         return '<Schema {}>'.format(self.path)
