@@ -202,7 +202,9 @@ class Bucket:
         for key in c.iternext(values=False):
             if not key.startswith(prefix):
                 break
-            ret.append(Flake.from_bytes(key[len(prefix):]))
+            _id = Flake.from_bytes(key[len(prefix):])
+            item = self.session[self.spec['item']][_id]
+            ret.append(item)
         return ret
 
     def set(self, item):
@@ -224,12 +226,19 @@ class HashItem:
     def encode(self):
         return self._id
 
+    def __eq__(self, other):
+        return type(self) == type(other) and self._id == other._id
+
 
 class Hash:
     def __init__(self, session, spec, key):
         self.session = session
         self.spec = spec
         self.key = key
+
+    def __getitem__(self, _id):
+        key = self.key + [_id]
+        return HashItem(self.session, self.spec, key)
 
     def insert(self, data):
         _id = self.session.tx._id()
@@ -247,6 +256,8 @@ class Session:
         d = self.schema[name]
         assert d['typ'] == 'hash'
         return Hash(self, d, [name])
+
+    __getitem__ = __getattr__
 
     def __repr__(self):
         return '<Session {}>'.format(self.path)

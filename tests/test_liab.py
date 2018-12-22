@@ -24,6 +24,7 @@ schema = {
         'typ': 'hash',
         'users': {
             'typ': 'bucket',
+            'item': 'user',
         },
         'messaegs': {
             'typ': 'stream',
@@ -45,11 +46,11 @@ def test_schema(tmp_path):
 
         r1 = s.room.insert({'name': 'Group'})
         u1.rooms.set(r1)
-        assert u1.rooms.get() == [r1._id]
+        assert u1.rooms.get() == [r1]
 
         assert r1.users.get() == []
         r1.users.set(u1)
-        assert r1.users.get() == [u1._id]
+        assert r1.users.get() == [u1]
 
 
 """
