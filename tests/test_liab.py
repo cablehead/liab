@@ -33,7 +33,7 @@ schema = {
 }
 
 
-def test_schema(tmp_path):
+def test_core(tmp_path):
     store = liab.Store(schema, str(tmp_path))
     with store.wx() as wx:
         pytest.raises(KeyError, lambda: wx.foo)

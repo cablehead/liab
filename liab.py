@@ -158,10 +158,6 @@ class Rx:
 
     __getitem__ = __getattr__
 
-    def __repr__(self):
-        print('oh hai')
-        return '<Session {}>'.format(self.path)
-
 
 class Wx(Rx):
     def __init__(self, store):
