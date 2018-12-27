@@ -124,55 +124,72 @@ class DB:
         return self.tx.put(*a, **kw)
 
 
-class LIAB:
-    def __init__(self, path):
+class Rx:
+    def __init__(self, store):
+        self.store = store
+        self.spec = self.store.schema
+        self.tx = self.store.env.begin()
+
+    @property
+    def o(self):
+        return DB(self.tx, self.store.o)
+
+    @property
+    def i(self):
+        return DB(self.tx, self.store.i)
+
+    @property
+    def m(self):
+        return DB(self.tx, self.store.m)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type:
+            self.tx.abort()
+        else:
+            self.tx.commit()
+
+    def __getattr__(self, name):
+        d = self.spec[name]
+        assert d['typ'] == 'hash'
+        return Hash(self, d, [name])
+
+    __getitem__ = __getattr__
+
+    def __repr__(self):
+        print('oh hai')
+        return '<Session {}>'.format(self.path)
+
+
+class Wx(Rx):
+    def __init__(self, store):
+        self.store = store
+        self.spec = self.store.schema
+        self.tx = self.store.env.begin(write=True)
+
+    def _id(self):
+        return next_id(
+            0,
+            lambda: self.m.get(b'flake'),
+            lambda x: self.m.put(b'flake', x))
+
+
+
+class Store:
+    def __init__(self, schema, path):
+        self.schema = schema
         self.env = lmdb.open(path, max_dbs=3)
         self.o = self.env.open_db(b'o')  # objects
         self.i = self.env.open_db(b'i')  # indices
         self.m = self.env.open_db(b'm')  # meta
 
     def rx(self):
-        return LIAB.Rx(self)
+        return Rx(self)
 
     def wx(self):
-        return LIAB.Wx(self)
-
-    class Rx:
-        def __init__(self, store):
-            self.store = store
-            self.tx = self.store.env.begin()
-
-        @property
-        def o(self):
-            return DB(self.tx, self.store.o)
-
-        @property
-        def i(self):
-            return DB(self.tx, self.store.i)
-
-        @property
-        def m(self):
-            return DB(self.tx, self.store.m)
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            if exc_type:
-                self.tx.abort()
-            else:
-                self.tx.commit()
-
-    class Wx(Rx):
-        def __init__(self, store):
-            self.store = store
-            self.tx = self.store.env.begin(write=True)
-
-        def _id(self):
-            return next_id(
-                0,
-                lambda: self.m.get(b'flake'),
-                lambda x: self.m.put(b'flake', x))
+        return Wx(self)
 
 
 class Stream:
@@ -182,14 +199,14 @@ class Stream:
         self.key = key
 
     def append(self, data):
-        _id = self.session.tx._id()
+        _id = self.session._id()
         item = Item(self.session, self.spec, self.key + [_id])
         item.set(data)
         return item
 
     def tail(self):
         prefix = to_bytes(self.key)
-        c = self.session.tx.i.cursor()
+        c = self.session.i.cursor()
         c.set_range(prefix + Flake(256**7-1).to_bytes())
         if not c.key().startswith(prefix):
             c.prev()
@@ -209,7 +226,7 @@ class Bucket:
         self.key = key
 
     def get(self):
-        c = self.session.tx.o.cursor()
+        c = self.session.o.cursor()
         prefix = to_bytes(self.key)
         c.set_range(prefix)
         ret = []
@@ -222,7 +239,7 @@ class Bucket:
         return ret
 
     def set(self, item):
-        return self.session.tx.o.put(to_bytes(self.key, item))
+        return self.session.o.put(to_bytes(self.key, item))
 
 
 class Item:
@@ -244,7 +261,7 @@ class Item:
         return self._id
 
     def set(self, data):
-        return self.session.tx.i.put(to_bytes(self.key), msgpack.packb(data))
+        return self.session.i.put(to_bytes(self.key), msgpack.packb(data))
 
     def __eq__(self, other):
         return type(self) == type(other) and self._id == other._id
@@ -261,23 +278,7 @@ class Hash:
         return Item(self.session, self.spec, key)
 
     def insert(self, data):
-        _id = self.session.tx._id()
+        _id = self.session._id()
         item = Item(self.session, self.spec, self.key + [_id])
         item.set(data)
         return item
-
-
-class Session:
-    def __init__(self, schema, tx):
-        self.schema = schema
-        self.tx = tx
-
-    def __getattr__(self, name):
-        d = self.schema[name]
-        assert d['typ'] == 'hash'
-        return Hash(self, d, [name])
-
-    __getitem__ = __getattr__
-
-    def __repr__(self):
-        return '<Session {}>'.format(self.path)

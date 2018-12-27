@@ -34,16 +34,15 @@ schema = {
 
 
 def test_schema(tmp_path):
-    store = liab.LIAB(str(tmp_path))
+    store = liab.Store(schema, str(tmp_path))
     with store.wx() as wx:
-        s = liab.Session(schema, wx)
-        pytest.raises(KeyError, lambda: s.foo)
+        pytest.raises(KeyError, lambda: wx.foo)
 
-        u1 = s.user.insert({'name': 'John'})
+        u1 = wx.user.insert({'name': 'John'})
         pytest.raises(KeyError, lambda: u1.foo)
         assert u1.rooms.get() == []
 
-        r1 = s.room.insert({'name': 'Group'})
+        r1 = wx.room.insert({'name': 'Group'})
         u1.rooms.set(r1)
         assert u1.rooms.get() == [r1]
 
