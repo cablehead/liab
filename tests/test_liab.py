@@ -26,7 +26,7 @@ schema = {
             'typ': 'bucket',
             'item': 'user',
         },
-        'messaegs': {
+        'messages': {
             'typ': 'stream',
         },
     },
@@ -51,6 +51,9 @@ def test_schema(tmp_path):
         assert r1.users.get() == []
         r1.users.set(u1)
         assert r1.users.get() == [u1]
+
+        m = r1.messages
+        print(m.append({'body': 'oh hai'}))
 
 
 """

@@ -188,6 +188,19 @@ class LIAB:
                 lambda x: self.m.put(b'flake', x))
 
 
+class Stream:
+    def __init__(self, session, spec, key):
+        self.session = session
+        self.spec = spec
+        self.key = key
+
+    def append(self, data):
+        _id = self.session.tx._id()
+        item = Item(self.session, self.spec, self.key + [_id])
+        item.set(data)
+        return item
+
+
 class Bucket:
     def __init__(self, session, spec, key):
         self.session = session
@@ -211,7 +224,7 @@ class Bucket:
         return self.session.tx.o.put(to_bytes(self.key, item))
 
 
-class HashItem:
+class Item:
     def __init__(self, session, spec, key):
         self.session = session
         self.spec = spec
@@ -220,11 +233,17 @@ class HashItem:
 
     def __getattr__(self, name):
         d = self.spec[name]
-        assert d['typ'] == 'bucket'
-        return Bucket(self.session, d, self.key + [name])
+        assert d['typ'] in ['bucket', 'stream']
+        return {
+            'bucket': Bucket,
+            'stream': Stream,
+        }[d['typ']](self.session, d, self.key + [name])
 
     def encode(self):
         return self._id
+
+    def set(self, data):
+        return self.session.tx.i.put(to_bytes(self.key), msgpack.packb(data))
 
     def __eq__(self, other):
         return type(self) == type(other) and self._id == other._id
@@ -238,13 +257,13 @@ class Hash:
 
     def __getitem__(self, _id):
         key = self.key + [_id]
-        return HashItem(self.session, self.spec, key)
+        return Item(self.session, self.spec, key)
 
     def insert(self, data):
         _id = self.session.tx._id()
-        key = self.key + [_id]
-        self.session.tx.i.put(to_bytes(key), msgpack.packb(data))
-        return HashItem(self.session, self.spec, key)
+        item = Item(self.session, self.spec, self.key + [_id])
+        item.set(data)
+        return item
 
 
 class Session:
