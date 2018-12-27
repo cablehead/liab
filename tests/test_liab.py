@@ -37,8 +37,11 @@ def test_core(tmp_path):
     store = liab.Store(schema, str(tmp_path))
     with store.wx() as wx:
         pytest.raises(KeyError, lambda: wx.foo)
+        assert wx.user['unknown'].value() is None
 
         u1 = wx.user.insert({'name': 'John'})
+        assert wx.user[u1].value() == {'name': 'John'}
+
         pytest.raises(KeyError, lambda: wx.user[u1].foo)
         assert wx.user[u1].rooms.get() == []
 

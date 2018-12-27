@@ -257,6 +257,12 @@ class Item:
     def set(self, data):
         return self.session.i.put(to_bytes(self.key), msgpack.packb(data))
 
+    def value(self):
+        data = self.session.i.get(to_bytes(self.key))
+        if not data:
+            return
+        return msgpack.unpackb(data, raw=False)
+
     def __eq__(self, other):
         return type(self) == type(other) and self._id == other._id
 
