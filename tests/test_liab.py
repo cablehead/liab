@@ -34,7 +34,6 @@ schema = {
 
 
 def test_schema(tmp_path):
-    print()
     store = liab.LIAB(str(tmp_path))
     with store.wx() as wx:
         s = liab.Session(schema, wx)
@@ -52,46 +51,8 @@ def test_schema(tmp_path):
         r1.users.set(u1)
         assert r1.users.get() == [u1]
 
-        m = r1.messages
-        print(m.append({'body': 'oh hai'}))
-
-
-"""
-def test_relation(tmp_path):
-    s = liab.LIAB(str(tmp_path))
-    with s.wx() as wx:
-        r1 = wx.insert('room', {})
-        r2 = wx.insert('room', {'name': 'Group'})
-        u1 = wx.insert('user', {'name': 'John'})
-        u2 = wx.insert('user', {'name': 'Tom'})
-        u3 = wx.insert('person', {'name': 'Sam'})
-
-
-def test_core(tmp_path):
-    s = liab.LIAB(str(tmp_path))
-
-    with s.wx() as wx:
-        assert wx._id() < wx._id()
-        want = [
-            wx.insert('person', {'name': 'John'}),
-            wx.insert('person', {'name': 'Tom'}),
-            wx.insert('person', {'name': 'Sam'}),
-            wx.insert('cat', {'name': 'Losh'}),
-            wx.insert('cat', {'name': 'Hop'}), ]
-        want.reverse()
-
-        got = []
-        for key in wx.get('cat'):
-            got.append(key)
-        for key in wx.get('person'):
-            got.append(key)
-        assert want == got
-
-    with s.rx() as rx:
-        got = []
-        for key in rx.get('cat'):
-            got.append(key)
-        for key in rx.get('person'):
-            got.append(key)
-        assert want == got
-"""
+        m1 = r1.messages.append({'body': 'message 1'})
+        m2 = r1.messages.append({'body': 'message 2'})
+        m3 = r1.messages.append({'body': 'message 3'})
+        m4 = r1.messages.append({'body': 'message 4'})
+        assert list(r1.messages.tail()) == [m4, m3, m2, m1]
