@@ -163,19 +163,6 @@ class LIAB:
             else:
                 self.tx.commit()
 
-        def get(self, name):
-            prefix = to_bytes(name)
-            c = self.tx.cursor(db=self.store.o)
-
-            c.set_range(prefix + Flake(256**7-1).to_bytes())
-            if not c.key().startswith(prefix):
-                c.prev()
-
-            for key in c.iterprev(values=False):
-                if not key.startswith(prefix):
-                    return
-                yield Flake.from_bytes(c.key()[len(prefix):])
-
     class Wx(Rx):
         def __init__(self, store):
             self.store = store
