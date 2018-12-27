@@ -194,11 +194,13 @@ class Stream:
         self.spec = spec
         self.key = key
 
+    def __getitem__(self, _id):
+        return Item(self.session, self.spec, self.key + [_id])
+
     def append(self, data):
         _id = self.session._id()
-        item = Item(self.session, self.spec, self.key + [_id])
-        item.set(data)
-        return item
+        self[_id].set(data)
+        return _id
 
     def tail(self):
         prefix = to_bytes(self.key)
@@ -209,10 +211,7 @@ class Stream:
         for key in c.iterprev(values=False):
             if not key.startswith(prefix):
                 return
-            yield Item(
-                self.session,
-                self.spec,
-                self.key + [Flake.from_bytes(c.key()[len(prefix):])])
+            yield Flake.from_bytes(c.key()[len(prefix):])
 
 
 class Bucket:
@@ -230,8 +229,7 @@ class Bucket:
             if not key.startswith(prefix):
                 break
             _id = Flake.from_bytes(key[len(prefix):])
-            item = self.session[self.spec['item']][_id]
-            ret.append(item)
+            ret.append(_id)
         return ret
 
     def set(self, item):
@@ -270,11 +268,9 @@ class Hash:
         self.key = key
 
     def __getitem__(self, _id):
-        key = self.key + [_id]
-        return Item(self.session, self.spec, key)
+        return Item(self.session, self.spec, self.key + [_id])
 
     def insert(self, data):
         _id = self.session._id()
-        item = Item(self.session, self.spec, self.key + [_id])
-        item.set(data)
-        return item
+        self[_id].set(data)
+        return _id

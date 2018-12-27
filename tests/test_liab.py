@@ -39,19 +39,19 @@ def test_core(tmp_path):
         pytest.raises(KeyError, lambda: wx.foo)
 
         u1 = wx.user.insert({'name': 'John'})
-        pytest.raises(KeyError, lambda: u1.foo)
-        assert u1.rooms.get() == []
+        pytest.raises(KeyError, lambda: wx.user[u1].foo)
+        assert wx.user[u1].rooms.get() == []
 
         r1 = wx.room.insert({'name': 'Group'})
-        u1.rooms.set(r1)
-        assert u1.rooms.get() == [r1]
+        wx.user[u1].rooms.set(r1)
+        assert wx.user[u1].rooms.get() == [r1]
 
-        assert r1.users.get() == []
-        r1.users.set(u1)
-        assert r1.users.get() == [u1]
+        assert wx.room[r1].users.get() == []
+        wx.room[r1].users.set(u1)
+        assert wx.room[r1].users.get() == [u1]
 
-        m1 = r1.messages.append({'body': 'message 1'})
-        m2 = r1.messages.append({'body': 'message 2'})
-        m3 = r1.messages.append({'body': 'message 3'})
-        m4 = r1.messages.append({'body': 'message 4'})
-        assert list(r1.messages.tail()) == [m4, m3, m2, m1]
+        m1 = wx.room[r1].messages.append({'body': 'message 1'})
+        m2 = wx.room[r1].messages.append({'body': 'message 2'})
+        m3 = wx.room[r1].messages.append({'body': 'message 3'})
+        m4 = wx.room[r1].messages.append({'body': 'message 4'})
+        assert list(wx.room[r1].messages.tail()) == [m4, m3, m2, m1]
